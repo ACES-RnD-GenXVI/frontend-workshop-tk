@@ -6,32 +6,33 @@ import {
   VStack,
   Badge,
   HStack,
-  Icon,
   useToast,
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
-import { useBLE } from "../hooks/useBLE";
+import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "./context/BluetoothContext";
 
 const BLEDeviceManager = ({
   device,
-  serviceUUIDs = [],
   onConnected,
   onDisconnected,
   onServicesDiscovered,
 }) => {
   const toast = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
-  const { connectToDevice, disconnect, connectedDevice, error } = useBLE({
-    services: serviceUUIDs,
-  });
+  
+  // Konsumsi state koneksi aplikasi dari Context bersama
+  const { 
+    connectToDevice, 
+    disconnect, 
+    connectedDevice, 
+    setActiveCharacteristic,
+    error 
+  } = useAppBluetooth();
 
   useEffect(() => {
-    // console.log("Connected to device:", connectedDevice);
-
     if (connectedDevice) {
       onConnected(connectedDevice);
     } else {
-      // console.log("Disconnected dari dalam from device.");
       onDisconnected && onDisconnected();
     }
   }, [connectedDevice, onConnected, onDisconnected]);
@@ -41,17 +42,19 @@ const BLEDeviceManager = ({
     try {
       const result = await connectToDevice(device);
       if (result) {
-        // console.log("Connected to device:", device);
+        // Daftarkan gatt characteristic ke context global agar modul Login & Register bisa langsung memakainya
+        if (result.services && result.services[ESP32_SERVICE_UUID]) {
+          const char = result.services[ESP32_SERVICE_UUID][ESP32_CHAR_UUID];
+          setActiveCharacteristic(char);
+        }
 
-        // Pass discovered services back to parent component
         if (result.services && onServicesDiscovered) {
-          // console.log("Services discovered:", result.services);
           onServicesDiscovered(result.services);
         }
 
         toast({
-          title: "Connected",
-          description: `Connected to ${device.name || "device"}`,
+          title: "Terhubung",
+          description: `Berhasil terhubung ke ${device.name || "device"}`,
           status: "success",
           duration: 3000,
           isClosable: true,
@@ -59,7 +62,7 @@ const BLEDeviceManager = ({
       }
     } catch (err) {
       toast({
-        title: "Connection failed",
+        title: "Koneksi gagal",
         description: err.message,
         status: "error",
         duration: 5000,
@@ -72,9 +75,10 @@ const BLEDeviceManager = ({
 
   const handleDisconnect = async () => {
     await disconnect();
+    setActiveCharacteristic(null); // Bersihkan characteristic saat terputus
     toast({
-      title: "Disconnected",
-      description: `Disconnected from ${device.name || "device"}`,
+      title: "Terputus",
+      description: `Hubungan dengan ${device.name || "device"} diputuskan`,
       status: "info",
       duration: 3000,
       isClosable: true,
@@ -82,14 +86,7 @@ const BLEDeviceManager = ({
   };
 
   return (
-    <Box
-      borderWidth="1px"
-      borderRadius="lg"
-      p={4}
-      mb={4}
-      bg="white"
-      boxShadow="sm"
-    >
+    <Box borderWidth="1px" borderRadius="lg" p={4} mb={4} bg="white" boxShadow="sm">
       <VStack spacing={4} align="flex-start">
         <HStack justifyContent="space-between" width="100%">
           <Heading size="md">{device.name || "Unknown Device"}</Heading>
@@ -98,21 +95,21 @@ const BLEDeviceManager = ({
           </Badge>
         </HStack>
 
-        <Text>Device ID: {device.id}</Text>
+        <Text fontSize="sm">Device ID: {device.id}</Text>
 
         {connectedDevice ? (
           <Button colorScheme="red" onClick={handleDisconnect} w="full">
-            Disconnect
+            Putuskan Koneksi
           </Button>
         ) : (
           <Button
             colorScheme="blue"
             onClick={handleConnect}
             isLoading={isConnecting}
-            loadingText="Connecting..."
+            loadingText="Menghubungkan..."
             w="full"
           >
-            Connect
+            Hubungkan
           </Button>
         )}
 
