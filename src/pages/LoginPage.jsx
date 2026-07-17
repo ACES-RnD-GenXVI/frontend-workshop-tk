@@ -13,6 +13,10 @@ import {
 import Header from "../components/Header";
 import QuickLoginModal from "../components/QuickLoginModal";
 import { addAuthLog } from "../data/authLogs";
+import bcrypt from "bcryptjs";
+
+import { db } from "../firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
   const [email, setEmail] = useState("");
@@ -38,25 +42,51 @@ const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
     h: "44px",
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Email dan password wajib diisi.");
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      const stored = localStorage.getItem("users");
-      const users = stored ? JSON.parse(stored) : [];
-      const user = users.find(
-        (u) => u.email === email && u.password === password
-      );
-      if (user) {
-        setError("");
-        user.loginTime = new Date().toLocaleTimeString();
-        localStorage.setItem("currentUser", JSON.stringify(user));
-        addAuthLog("Authentication Success");
-        onLoginSuccess();
+    setError("");
+
+    try {
+      const usersCollectionRef = collection(db, "users");
+
+      const emailQuery = query(usersCollectionRef, where("email", "==", email));
+      const querySnapshot = await getDocs(emailQuery);
+
+      if (!querySnapshot.empty) {
+        let userCloudData = null;
+
+        querySnapshot.forEach((doc) => {
+          userCloudData = doc.data();
+        });
+
+        const isPasswordMatch = bcrypt.compareSync(password, userCloudData.password);
+
+        if (userCloudData && isPasswordMatch) {
+          setError("");
+
+          userCloudData.loginTime = new Date().toLocaleTimeString();
+
+          delete userCloudData.password; 
+          localStorage.setItem("currentUser", JSON.stringify(userCloudData));
+
+          addAuthLog(`Email Authentication Success: ${email}`);
+          onLoginSuccess();
+        } else {
+          setError("Password yang Anda masukkan salah.");
+        }
       } else {
-        setError("Kredensial salah. Mohon periksa kembali email dan password.");
+        setError("Email tidak terdaftar dalam sistem cloud.");
       }
-    }, 1200);
+    } catch (err) {
+      setError("Gagal terhubung ke Cloud Firebase: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e) => {

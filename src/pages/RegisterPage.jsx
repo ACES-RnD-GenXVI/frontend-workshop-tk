@@ -15,6 +15,7 @@ import {
 } from "@chakra-ui/react";
 import Header from "../components/Header";
 import { addAuthLog } from "../data/authLogs";
+import bcrypt from "bcryptjs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
 
 import { db } from "../firebase";
@@ -125,7 +126,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
     try {
       const usersCollectionRef = collection(db, "users");
 
-      // 1. Validasi Cloud: Cek apakah email sudah terdaftar di Firestore
       const emailQuery = query(usersCollectionRef, where("email", "==", email));
       const emailSnapshot = await getDocs(emailQuery);
       if (!emailSnapshot.empty) {
@@ -134,7 +134,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
         return;
       }
 
-      // 2. Validasi Cloud: Cek apakah Card UID sudah terikat dengan akun lain di Firestore
       const uidQuery = query(usersCollectionRef, where("cardUID", "==", detectedUID));
       const uidSnapshot = await getDocs(uidQuery);
       if (!uidSnapshot.empty) {
@@ -143,30 +142,21 @@ const RegisterPage = ({ onNavigateToLogin }) => {
         return;
       }
 
-      // 3. Simpan data user baru secara permanen ke Firebase Firestore
-      const newUser = { name, email, password, cardUID: detectedUID };
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(password, salt);
+
+      const newUser = { name, email, password: hashedPassword, cardUID: detectedUID };
       await addDoc(usersCollectionRef, {
         ...newUser,
         createdAt: new Date().toISOString()
       });
 
-      // Tetap sinkronkan ke local storage penunjang log lokal bawaan Anda
-      const stored = localStorage.getItem("users");
-      const users = stored ? JSON.parse(stored) : [];
-      users.push(newUser);
-      localStorage.setItem("users", JSON.stringify(users));
-      
-      addAuthLog(`User baru didaftarkan ke Cloud: ${name} (${detectedUID})`);
+      addAuthLog(`User baru didaftarkan: ${name}`);
 
       toast({ title: "Registrasi Akun Sukses!", status: "success", position: "top" });
       onNavigateToLogin();
     } catch (error) {
-      toast({
-        title: "Firebase Error",
-        description: error.message,
-        status: "error",
-        position: "top",
-      });
+      toast({ title: "Firebase Error", description: error.message, status: "error", position: "top" });
     } finally {
       setIsRegistering(false);
     }

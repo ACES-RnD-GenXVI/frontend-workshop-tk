@@ -2,11 +2,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeAppCheck, ReCaptchaV3Provider, CustomProvider } from "firebase/app-check";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyBo2D9vhncvurJzF2mbn_F9SuSrgZk1fxc",
   authDomain: "workshop-tk-aces-xvi.firebaseapp.com",
@@ -20,6 +17,23 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
+
+if (typeof window !== "undefined") {
+  const isDevelopment = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+  if (isDevelopment) {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
+  initializeAppCheck(app, {
+    provider: isDevelopment
+      ? new CustomProvider({
+          getToken: () => new Promise((resolve) => resolve({ token: 'debug' }))
+        })
+      : new ReCaptchaV3Provider("6LdQHFctAAAAAJcQztxmwTgSxZ9q4Uh7oWctE4W-"),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 // Inisialisasi Firestore Database
 export const db = getFirestore(app);

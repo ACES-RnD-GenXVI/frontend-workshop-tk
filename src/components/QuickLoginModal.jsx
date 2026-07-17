@@ -1,4 +1,3 @@
-// src/components/QuickLoginModal.jsx
 import { useState, useEffect, useRef } from "react";
 import {
   Modal,
@@ -11,11 +10,11 @@ import {
   VStack,
   HStack,
   Button,
+  Input,
 } from "@chakra-ui/react";
 import { addAuthLog } from "../data/authLogs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
 
-// Import instance db dari konfigurasi Firebase proyek Anda
 import { db } from "../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
@@ -30,6 +29,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const { connectedDevice, activeCharacteristic, startNotifications } = useAppBluetooth();
   const [scanState, setScanState] = useState(SCAN_STATE.IDLE);
   const [detectedUID, setDetectedUID] = useState(null);
+  const [manualUIDInput, setManualUIDInput] = useState("");
   const [cardError, setCardError] = useState("");
   const [scanMessage, setScanMessage] = useState("");
   const unsubscribeRef = useRef(null);
@@ -39,53 +39,52 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       if (unsubscribeRef.current) unsubscribeRef.current();
       setScanState(SCAN_STATE.IDLE);
       setDetectedUID(null);
+      setManualUIDInput("");
       setCardError("");
       setScanMessage("");
     }
   }, [isOpen]);
 
   const handleStartScan = async () => {
-    // Bagian pengecekan koneksi Bluetooth dilewati sementara untuk keperluan simulasi software
-    setScanState(SCAN_STATE.SCANNING);
-    setCardError("");
-    setScanMessage("Mengaktifkan simulasi pembacaan kartu...");
-
-    setTimeout(() => {
-      const mockLoginUID = localStorage.getItem("lastMockUID") || "A4-B2-F9-1C";
-
-      setDetectedUID(mockLoginUID);
-      processAuthentication(mockLoginUID);
-    }, 1500);
-
-    /* // CATATAN: Jika hardware ESP32 sudah siap, hapus baris simulasi di atas
-    // dan kembalikan tanda komentar (uncomment) pada kode asli Web Bluetooth di bawah ini:
-
-    if (!connectedDevice || !activeCharacteristic) {
-      setCardError("Perangkat Bluetooth belum terhubung. Silakan hubungkan via Pop-up terlebih dahulu.");
+    // Jalankan otentikasi menggunakan UID yang dimasukkan di form simulator
+    if (!manualUIDInput.trim()) {
+      setCardError("Untuk keperluan simulasi browser, isi UID Kartu terlebih dahulu.");
       return;
     }
 
     setScanState(SCAN_STATE.SCANNING);
     setCardError("");
-    setScanMessage("Silakan tempelkan kartu RFID Anda pada alat reader...");
+    setScanMessage("Mengaktifkan simulasi pembacaan kartu...");
 
+    setTimeout(() => {
+      const targetUID = manualUIDInput.trim().toUpperCase();
+      setDetectedUID(targetUID);
+      processAuthentication(targetUID);
+    }, 1200);
+
+    /* // JIKA HARDWARE ESP32 SUDAH SIAP, HAPUS SIMULASI DI ATAS DAN GUNAKAN KODE ASLI INI:
+    if (!connectedDevice || !activeCharacteristic) {
+      setCardError("Perangkat Bluetooth belum terhubung.");
+      return;
+    }
+    setScanState(SCAN_STATE.SCANNING);
+    setCardError("");
+    setScanMessage("Silakan tempelkan kartu RFID Anda...");
     try {
       const handleDataNotification = (event) => {
         const value = event.target.value;
         const decoder = new TextDecoder("utf-8");
         const uidString = decoder.decode(value).trim();
-
         if (uidString) {
           setDetectedUID(uidString);
-          if (unsubscribeRef.current) unsubscribeRef.current(); // Berhenti mendengarkan setelah kartu didapat
+          if (unsubscribeRef.current) unsubscribeRef.current();
           processAuthentication(uidString);
         }
       };
-
       const unsub = await startNotifications(ESP32_SERVICE_UUID, ESP32_CHAR_UUID, handleDataNotification);
       unsubscribeRef.current = unsub;
     } catch (err) {
-      setCardError("Gagal mengaktifkan sensor RFID: " + err.message);
+      setCardError("Gagal mengaktifkan sensor: " + err.message);
       setScanState(SCAN_STATE.IDLE);
     }
     */
@@ -97,13 +96,10 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
     try {
       const usersCollectionRef = collection(db, "users");
-      
-      // Mengirimkan query pencarian langsung ke database Firebase Firestore berdasarkan field cardUID
       const uidQuery = query(usersCollectionRef, where("cardUID", "==", uid));
       const querySnapshot = await getDocs(uidQuery);
 
       if (!querySnapshot.empty) {
-        // Jika kecocokan dokumen pengguna ditemukan di dalam database cloud
         let userCloudData = {};
         querySnapshot.forEach((doc) => {
           userCloudData = doc.data();
@@ -111,12 +107,11 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
         setScanMessage("Otentikasi Cloud Berhasil!");
         setScanState(SCAN_STATE.UID_DETECTED);
-        
+
         userCloudData.loginTime = new Date().toLocaleTimeString();
         localStorage.setItem("currentUser", JSON.stringify(userCloudData));
         addAuthLog(`RFID Cloud Authentication Success: Card ${uid}`);
-        
-        // Kirim feedback sukses ke hardware ('1') jika karakteristik Bluetooth terdeteksi aktif
+
         if (activeCharacteristic) {
           const encoder = new TextEncoder();
           activeCharacteristic.writeValue(encoder.encode("1")).catch(console.error);
@@ -127,10 +122,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           onClose();
         }, 1000);
       } else {
-        // Jika data kartu RFID tidak ada di dalam database cloud Firebase
         setScanMessage("Otentikasi Gagal");
-        
-        // Kirim feedback gagal ke hardware ('0') jika karakteristik Bluetooth terdeteksi aktif
         if (activeCharacteristic) {
           const encoder = new TextEncoder();
           activeCharacteristic.writeValue(encoder.encode("0")).catch(console.error);
@@ -165,16 +157,36 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
             <VStack spacing={1} textAlign="center">
               <Text fontSize="16px" fontWeight="700" color="#0d2d6b" letterSpacing="-0.3px">
-                {scanState === SCAN_STATE.IDLE && "Smart Login"}
-                {scanState === SCAN_STATE.SCANNING && "Membaca Kartu RFID..."}
-                {scanState === SCAN_STATE.AUTHENTICATING && "Validasi Identitas..."}
+                {scanState === SCAN_STATE.IDLE && "Smart Login Simulator"}
+                {scanState === SCAN_STATE.SCANNING && "Membaca Kartu..."}
+                {scanState === SCAN_STATE.AUTHENTICATING && "Validasi Identitas Cloud..."}
                 {scanState === SCAN_STATE.UID_DETECTED && "Kartu Dikenali"}
               </Text>
               <Text fontSize="13px" color="gray.500" maxW="220px" lineHeight="1.55">
-                {scanState === SCAN_STATE.IDLE && "Tempelkan kartu RFID Anda untuk login otomatis"}
+                {scanState === SCAN_STATE.IDLE && "Masukkan UID hasil registrasi untuk simulasi tap kartu"}
                 {scanState !== SCAN_STATE.IDLE && scanMessage}
               </Text>
             </VStack>
+
+            {scanState === SCAN_STATE.IDLE && (
+              <VStack w="full" spacing={3}>
+                <Input
+                  placeholder="Contoh: B3-F4-1A-9D"
+                  value={manualUIDInput}
+                  onChange={(e) => { setManualUIDInput(e.target.value); setCardError(""); }}
+                  textAlign="center"
+                  fontWeight="bold"
+                  fontFamily="mono"
+                  h="44px"
+                  borderRadius="8px"
+                  bg="gray.50"
+                  fontSize="sm"
+                />
+                <Button onClick={handleStartScan} bg="white" color="#F97316" border="1.5px solid" borderColor="#F97316" _hover={{ bg: "#fff7ed" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="700">
+                  Simulasikan Tap Kartu
+                </Button>
+              </VStack>
+            )}
 
             {scanState !== SCAN_STATE.IDLE && (
               <Box w="full" borderRadius="8px" border="1px solid" borderColor={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : "gray.200"} overflow="hidden">
@@ -198,12 +210,6 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
                   </Box>
                 )}
               </Box>
-            )}
-
-            {scanState === SCAN_STATE.IDLE && (
-              <Button onClick={handleStartScan} bg="white" color="#F97316" border="1.5px solid" borderColor="#F97316" _hover={{ bg: "#fff7ed" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="700">
-                Mulai Scan Kartu
-              </Button>
             )}
 
             {cardError && (
