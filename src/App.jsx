@@ -1,5 +1,6 @@
-import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+// src/App.jsx
+import { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import SuccessPage from "./pages/SuccessPage";
@@ -16,14 +17,38 @@ const DEFAULT_USERS = [
 
 const AppRoutes = () => {
   const navigate = useNavigate();
-  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+  const location = useLocation();
+  const [currentUser, setCurrentUser] = useState(() => 
+    JSON.parse(localStorage.getItem("currentUser"))
+  );
 
+  // Efek untuk memantau perubahan session setiap kali halaman berpindah
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("currentUser"));
+    setCurrentUser(user);
+  }, [location]);
+
+  // Efek untuk inisialisasi default user
   useEffect(() => {
     const existing = localStorage.getItem("users");
     if (!existing) {
       localStorage.setItem("users", JSON.stringify(DEFAULT_USERS));
     }
   }, []);
+
+  // Fungsi callback setelah login berhasil agar state langsung diperbarui secara instan
+  const handleLoginSuccess = () => {
+    const user = JSON.parse(localStorage.getItem("currentUser"));
+    setCurrentUser(user);
+    navigate("/success");
+  };
+
+  // Fungsi callback saat logout agar state langsung dikosongkan
+  const handleLogout = () => {
+    localStorage.removeItem("currentUser");
+    setCurrentUser(null);
+    navigate("/login");
+  };
 
   return (
     <Routes>
@@ -45,7 +70,7 @@ const AppRoutes = () => {
           ) : (
             <LoginPage
               onNavigateToRegister={() => navigate("/register")}
-              onLoginSuccess={() => navigate("/success")}
+              onLoginSuccess={handleLoginSuccess}
             />
           )
         }
@@ -67,7 +92,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <SuccessPage
-              onLogout={() => navigate("/login")}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }

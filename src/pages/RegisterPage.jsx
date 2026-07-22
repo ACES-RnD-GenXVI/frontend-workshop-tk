@@ -1,6 +1,5 @@
 // src/pages/RegisterPage.jsx
-
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   Button,
@@ -16,337 +15,205 @@ import {
 } from "@chakra-ui/react";
 import Header from "../components/Header";
 import { addAuthLog } from "../data/authLogs";
+import bcrypt from "bcryptjs";
+import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
 
-const MOCK_UID = "A4-B2-F9-1C";
+import { db } from "../firebase";
+import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
 
 const RegisterPage = ({ onNavigateToLogin }) => {
   const toast = useToast();
+  const { connectedDevice, startNotifications } = useAppBluetooth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [detectedUID, setDetectedUID] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [scanMessage, setScanMessage] = useState("Waiting for RFID Card...");
+  const [scanMessage, setScanMessage] = useState("Menunggu Perintah Binding...");
+  const unsubscribeRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef.current) unsubscribeRef.current();
+    };
+  }, []);
+
+  const handleConnectSmartCard = async () => {
+    // Bagian Bluetooth dinonaktifkan sementara dan diganti dengan generator UID acak
+    setIsConnecting(true);
+    setDetectedUID(null);
+    setScanMessage("Mengaktifkan mode scan simulator...");
+
+    setTimeout(() => {
+      // Membuat kombinasi UID acak sebanyak 4 segmen heksadesimal (Contoh: B3-F4-1A-9D)
+      const hexChars = "0123456789ABCDEF";
+      let mockUID = "";
+      for (let i = 0; i < 4; i++) {
+        mockUID += hexChars[Math.floor(Math.random() * 16)] + hexChars[Math.floor(Math.random() * 16)];
+        if (i < 3) mockUID += "-";
+      }
+
+      setDetectedUID(mockUID);
+      setScanMessage("Kartu Sukses Terikat!");
+      setIsConnecting(false);
+
+      localStorage.setItem("lastMockUID", mockUID);
+
+      toast({
+        title: "Simulasi RFID Terdeteksi",
+        description: `Berhasil mendapatkan Card UID simulator: ${mockUID}`,
+        status: "success",
+        duration: 3000,
+        position: "top",
+      });
+    }, 1500);
+
+    /* // CATATAN: Jika hardware ESP32 sudah siap, hapus baris simulasi di atas
+    // dan kembalikan tanda komentar (uncomment) pada kode asli Web Bluetooth di bawah ini:
+
+    if (!connectedDevice) {
+      toast({
+        title: "Hardware Terputus",
+        description: "Silakan muat ulang halaman atau sambungkan ulang Bluetooth ESP32.",
+        status: "warning",
+        duration: 4000,
+        position: "top",
+      });
+      return;
+    }
+
+    setIsConnecting(true);
+    setDetectedUID(null);
+    setScanMessage("Mengaktifkan mode scan pendaftaran...");
+
+    try {
+      const handleRegisterNotification = (event) => {
+        const value = event.target.value;
+        const decoder = new TextDecoder("utf-8");
+        const rawUID = decoder.decode(value).trim();
+
+        if (rawUID) {
+          setDetectedUID(rawUID);
+          setScanMessage("Kartu Sukses Terikat!");
+          setIsConnecting(false);
+          if (unsubscribeRef.current) unsubscribeRef.current();
+        }
+      };
+
+      const unsub = await startNotifications(ESP32_SERVICE_UUID, ESP32_CHAR_UUID, handleRegisterNotification);
+      unsubscribeRef.current = unsub;
+      setScanMessage("Silakan tempelkan kartu RFID baru pada reader ESP32...");
+    } catch (err) {
+      toast({
+        title: "Gagal Mengaitkan",
+        description: err.message,
+        status: "error",
+      });
+      setIsConnecting(false);
+    }
+    */
+  };
+
+  const handleRegister = async () => {
+    if (!name || !email || !password || !detectedUID) {
+      toast({ title: "Formulir tidak lengkap", description: "Pastikan semua data diisi dan kartu sudah di-scan.", status: "warning", position: "top" });
+      return;
+    }
+
+    setIsRegistering(true);
+
+    try {
+      const usersCollectionRef = collection(db, "users");
+
+      const emailQuery = query(usersCollectionRef, where("email", "==", email));
+      const emailSnapshot = await getDocs(emailQuery);
+      if (!emailSnapshot.empty) {
+        toast({ title: "Email sudah terdaftar.", status: "error", position: "top" });
+        setIsRegistering(false);
+        return;
+      }
+
+      const uidQuery = query(usersCollectionRef, where("cardUID", "==", detectedUID));
+      const uidSnapshot = await getDocs(uidQuery);
+      if (!uidSnapshot.empty) {
+        toast({ title: "Kartu RFID ini sudah terikat akun lain!", status: "error", position: "top" });
+        setIsRegistering(false);
+        return;
+      }
+
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(password, salt);
+
+      const newUser = { name, email, password: hashedPassword, cardUID: detectedUID };
+      await addDoc(usersCollectionRef, {
+        ...newUser,
+        createdAt: new Date().toISOString()
+      });
+
+      addAuthLog(`User baru didaftarkan: ${name}`);
+
+      toast({ title: "Registrasi Akun Sukses!", status: "success", position: "top" });
+      onNavigateToLogin();
+    } catch (error) {
+      toast({ title: "Firebase Error", description: error.message, status: "error", position: "top" });
+    } finally {
+      setIsRegistering(false);
+    }
+  };
 
   const inputStyles = {
     bg: "gray.50",
     border: "1px solid",
     borderColor: "gray.200",
     borderRadius: "8px",
-    _hover: { borderColor: "gray.300", bg: "white" },
-    transition: "all 0.2s ease",
-    _focus: {
-      bg: "white",
-      borderColor: "#1a56db",
-      boxShadow: "0 0 0 3px rgba(59,130,246,0.12)",
-      outline: "none",
-    },
     fontSize: "sm",
     h: "44px",
   };
 
-  const generateRandomUID = () => {
-    const chars = '0123456789ABCDEF';
-    let uid = '';
-    for (let i = 0; i < 4; i++) {
-      uid += chars[Math.floor(Math.random() * 16)] + chars[Math.floor(Math.random() * 16)];
-      if (i < 3) uid += '-';
-    }
-    return uid;
-  };
-
-  const handleConnectSmartCard = () => {
-    setIsConnecting(true);
-    setDetectedUID(null);
-    setScanMessage("Initializing RFID Reader...");
-
-    setTimeout(() => setScanMessage("Scanning Smart Card..."), 600);
-    setTimeout(() => setScanMessage("Generating Secure Identifier..."), 1200);
-    setTimeout(() => setScanMessage("Binding Card To User..."), 1800);
-
-    setTimeout(() => {
-      setIsConnecting(false);
-      setDetectedUID(generateRandomUID());
-      setScanMessage("Card Linked Successfully");
-    }, 2400);
-  };
-
-  const handleRegister = () => {
-    setIsRegistering(true);
-    setTimeout(() => {
-      setIsRegistering(false);
-      const stored = localStorage.getItem("users");
-      const users = stored ? JSON.parse(stored) : [];
-
-      // Duplicate email check
-      const exists = users.find((u) => u.email === email);
-      if (exists) {
-        toast({
-          title: "Email already registered.",
-          description: "Please use a different email address.",
-          status: "error",
-          duration: 4000,
-          isClosable: true,
-          position: "top",
-        });
-        return;
-      }
-
-      // Duplicate RFID check
-      const cardExists = users.some((u) => u.cardUID === detectedUID);
-      if (cardExists) {
-        toast({
-          title: "Smart Card already registered",
-          status: "error",
-          duration: 4000,
-          isClosable: true,
-          position: "top",
-        });
-        return;
-      }
-
-      // Save new user
-      const newUser = { name, email, password, cardUID: detectedUID };
-      users.push(newUser);
-      localStorage.setItem("users", JSON.stringify(users));
-
-      addAuthLog("New User Registered");
-
-      toast({
-        title: "Account registered successfully.",
-        description: "You can now log in with your credentials.",
-        status: "success",
-        duration: 4000,
-        isClosable: true,
-        position: "top",
-      });
-
-      onNavigateToLogin();
-    }, 1500);
-  };
-
-  const uidReady = detectedUID !== null;
-
   return (
-    <Box
-      minH="100vh"
-      bg="#eaeff7"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      px={4}
-      py={8}
-    >
-      {/* Main card */}
-      <Box
-        w="full"
-        maxW="540px"
-        bg="white"
-        borderRadius="20px"
-        boxShadow="0 12px 48px rgba(13,45,107,0.15), 0 2px 8px rgba(0,0,0,0.08)"
-        px={{ base: 7, sm: 10 }}
-        py={8}
-        animation="fadeInUp 0.4s ease-out forwards"
-      >
-        {/* Logos */}
+    <Box minH="100vh" bg="#eaeff7" display="flex" alignItems="center" justifyContent="center" px={4} py={8}>
+      <Box w="full" maxW="540px" bg="white" borderRadius="20px" boxShadow="0 12px 48px rgba(13,45,107,0.15)" px={{ base: 7, sm: 10 }} py={8}>
         <Header />
-
         <Divider borderColor="gray.100" mb={6} />
-
-        {/* Title + subtitle */}
         <Box mb={6} textAlign="center">
-          <Text
-            fontSize="21px"
-            fontWeight="700"
-            color="#0d2d6b"
-            letterSpacing="-0.5px"
-            lineHeight="1.25"
-          >
-            Create Account
-          </Text>
-          <Text fontSize="13px" color="gray.500" mt={2} lineHeight="1.6" letterSpacing="0.1px">
-            Secure passwordless authentication
-          </Text>
+          <Text fontSize="21px" fontWeight="700" color="#0d2d6b">Registrasi Akun Baru</Text>
+          <Text fontSize="13px" color="gray.500" mt={1}>Lengkapi profil dan kaitkan dengan kartu pintar RFID</Text>
         </Box>
 
-        {/* Form */}
         <VStack spacing={4}>
-          {/* Name */}
           <FormControl>
-            <FormLabel
-              fontSize="10px"
-              fontWeight="700"
-              color="gray.400"
-              textTransform="uppercase"
-              letterSpacing="0.8px"
-              mb={1.5}
-            >
-              Full Name
-            </FormLabel>
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your full name"
-              {...inputStyles}
-            />
+            <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Nama Lengkap</FormLabel>
+            <Input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" {...inputStyles} />
+          </FormControl>
+          <FormControl>
+            <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Email</FormLabel>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" {...inputStyles} />
+          </FormControl>
+          <FormControl>
+            <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Password</FormLabel>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" {...inputStyles} />
           </FormControl>
 
-          {/* Email */}
           <FormControl>
-            <FormLabel
-              fontSize="10px"
-              fontWeight="700"
-              color="gray.400"
-              textTransform="uppercase"
-              letterSpacing="0.8px"
-              mb={1.5}
-            >
-              Email
-            </FormLabel>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              {...inputStyles}
-            />
+            <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Koneksi Kartu RFID</FormLabel>
+            <HStack w="full" spacing={3}>
+              <Input readOnly placeholder={detectedUID ? `UID: ${detectedUID}` : "Belum ada kartu terikat"} value={detectedUID || ""} {...inputStyles} bg="gray.100" fontWeight="bold" fontFamily="mono" color={detectedUID ? "green.600" : "gray.500"} />
+              <Button onClick={handleConnectSmartCard} isLoading={isConnecting} loadingText="Scanning..." bg="white" color="#F97316" border="1.5px solid" borderColor="#F97316" size="md" h="44px" px={5} fontSize="xs" fontWeight="700">
+                Scan Kartu
+              </Button>
+            </HStack>
+            {isConnecting && <Text fontSize="xs" color="blue.600" mt={1} fontWeight="500">{scanMessage}</Text>}
           </FormControl>
 
-          {/* Password */}
-          <FormControl>
-            <FormLabel
-              fontSize="10px"
-              fontWeight="700"
-              color="gray.400"
-              textTransform="uppercase"
-              letterSpacing="0.8px"
-              mb={1.5}
-            >
-              Password
-            </FormLabel>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              {...inputStyles}
-            />
-          </FormControl>
-
-          <Divider borderColor="gray.100" />
-
-          {/* Smart Card section */}
-          <Box w="full">
-
-            <Button
-              onClick={handleConnectSmartCard}
-              isLoading={isConnecting}
-              loadingText="Reading card..."
-              isDisabled={uidReady}
-              w="full"
-              h="44px"
-              borderRadius="8px"
-              fontSize="sm"
-              fontWeight="700"
-              bg={uidReady ? "#16a34a" : "#F97316"}
-              color="white"
-              transition="all 0.25s ease"
-              _hover={uidReady ? { bg: "#16a34a", transform: "translateY(-1px)" } : { bg: "#ea6c0a", transform: "translateY(-1px)" }}
-              _active={uidReady ? { transform: "scale(0.98)" } : { bg: "#d46009", transform: "scale(0.98)" }}
-              _disabled={{ opacity: 1, cursor: "not-allowed", transform: "none" }}
-              letterSpacing="0.2px"
-            >
-              {uidReady ? "✓ Smart Card Linked" : "Connect Smart Card"}
-            </Button>
-
-            {/* Status readout — always visible */}
-            <Box
-              mt={2}
-              borderRadius="8px"
-              border="1px solid"
-              borderColor={uidReady ? "#bbf7d0" : "gray.200"}
-              overflow="hidden"
-            >
-              {!uidReady ? (
-                <Box px={4} py={3} bg="gray.50">
-                  <HStack spacing={2}>
-                    <Box
-                      w="6px"
-                      h="6px"
-                      borderRadius="full"
-                      bg={isConnecting ? "#F97316" : "gray.300"}
-                      flexShrink={0}
-                    />
-                    <Text fontSize="13px" color={isConnecting ? "gray.600" : "gray.400"}>
-                      {scanMessage}
-                    </Text>
-                  </HStack>
-                </Box>
-              ) : (
-                <Box>
-                  <Box px={4} py="6px" bg="#f0fdf4" borderBottom="1px solid" borderColor="#bbf7d0">
-                    <Text fontSize="10px" fontWeight="700" color="#16a34a" letterSpacing="0.8px" textTransform="uppercase">
-                      Card UID Detected
-                    </Text>
-                  </Box>
-                  <Box px={4} py={3} bg="white">
-                    <Text
-                      fontSize="18px"
-                      fontWeight="700"
-                      color="#0d2d6b"
-                      letterSpacing="4px"
-                      fontFamily="mono"
-                    >
-                      {detectedUID}
-                    </Text>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </Box>
-
-          {/* Register Account */}
-          <Button
-            onClick={handleRegister}
-            isLoading={isRegistering}
-            loadingText="Creating Account..."
-            isDisabled={!uidReady}
-            bg={uidReady ? "#0d2d6b" : "gray.100"}
-            color={uidReady ? "white" : "gray.400"}
-            transition="all 0.25s ease"
-            _hover={{ bg: uidReady ? "#1a3f8f" : "gray.100", transform: uidReady ? "translateY(-1px)" : "none" }}
-            _active={{ bg: uidReady ? "#0a2254" : "gray.100", transform: uidReady ? "scale(0.98)" : "none" }}
-            _disabled={{ opacity: 1, cursor: "not-allowed", transform: "none" }}
-            w="full"
-            h="44px"
-            borderRadius="8px"
-            fontSize="sm"
-            fontWeight="600"
-            letterSpacing="0.3px"
-          >
-            Register Account
+          <Button onClick={handleRegister} isLoading={isRegistering} bg="#0d2d6b" color="white" _hover={{ bg: "#1a3f8f" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="600" mt={4}>
+            Daftar Sekarang
           </Button>
         </VStack>
 
-        {/* Back to login */}
         <Flex align="center" justify="center" mt={6} gap={1}>
-          <Text fontSize="sm" color="gray.400">
-            Sudah punya akun?
-          </Text>
-          <Button
-            variant="link"
-            fontSize="sm"
-            fontWeight="600"
-            color="#0d2d6b"
-            transition="all 0.2s ease"
-            onClick={onNavigateToLogin}
-            _hover={{ color: "#1a3f8f", textDecoration: "underline", transform: "translateY(-1px)" }}
-            _active={{ transform: "scale(0.98)" }}
-          >
-            Masuk
-          </Button>
+          <Text fontSize="sm" color="gray.400">Sudah punya akun?</Text>
+          <Button variant="link" fontSize="sm" fontWeight="600" color="#0d2d6b" onClick={onNavigateToLogin}>Login</Button>
         </Flex>
       </Box>
     </Box>

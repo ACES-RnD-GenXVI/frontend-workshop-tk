@@ -7,6 +7,8 @@ import {
   Flex,
   Text,
   VStack,
+  HStack,
+  Avatar,
 } from "@chakra-ui/react";
 import Header from "../components/Header";
 import { getAuthLogs } from "../data/authLogs";
@@ -59,6 +61,43 @@ const SuccessPage = ({ onLogout }) => {
         <Header />
 
         <Divider borderColor="gray.100" mb={6} />
+
+        {/* Profil User*/}
+        <Box 
+          p={4} 
+          bg="gray.50" 
+          borderRadius="14px" 
+          border="1px solid" 
+          borderColor="gray.200" 
+          mb={6}
+        >
+          <HStack spacing={4}>
+            <Avatar 
+              name={currentUser.name || "Admin"} 
+              bg="#0d2d6b" 
+              color="white" 
+              size="md" 
+            />
+            <VStack align="flex-start" spacing={0} flex={1}>
+              <Text 
+                fontSize="9px" 
+                fontWeight="700" 
+                color="#F97316" 
+                textTransform="uppercase" 
+                letterSpacing="0.8px"
+              >
+                Authenticated Profile
+              </Text>
+              <Text fontSize="16px" fontWeight="700" color="#0d2d6b">
+                {currentUser.name || "Admin User"}
+              </Text>
+              <Text fontSize="12px" color="gray.500">
+                {currentUser.email || "admin@tekkom.com"}
+              </Text>
+            </VStack>
+          </HStack>
+        </Box>
+        {/* ============================================================================ */}
 
         {/* Success indicator */}
         <VStack spacing={1} mb={6} textAlign="center">
