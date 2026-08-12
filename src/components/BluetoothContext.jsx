@@ -18,8 +18,6 @@ import { useBLE } from "../hooks/useBLE";
 
 const BluetoothContext = createContext(null);
 
-// UUID Service dan Characteristic sesuai konfigurasi BLE ESP32
-// GANTI SESUAI DENGAN UUID SERVICE DAN CHARACTERISTIC YANG DIGUNAKAN PADA ESP32
 export const ESP32_SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b"; 
 export const ESP32_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 

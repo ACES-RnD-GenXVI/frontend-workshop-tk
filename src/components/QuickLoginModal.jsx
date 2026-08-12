@@ -46,23 +46,6 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   }, [isOpen]);
 
   const handleStartScan = async () => {
-    // Jalankan otentikasi menggunakan UID yang dimasukkan di form simulator
-    if (!manualUIDInput.trim()) {
-      setCardError("Untuk keperluan simulasi browser, isi UID Kartu terlebih dahulu.");
-      return;
-    }
-
-    setScanState(SCAN_STATE.SCANNING);
-    setCardError("");
-    setScanMessage("Mengaktifkan simulasi pembacaan kartu...");
-
-    setTimeout(() => {
-      const targetUID = manualUIDInput.trim().toUpperCase();
-      setDetectedUID(targetUID);
-      processAuthentication(targetUID);
-    }, 1200);
-
-    /* // JIKA HARDWARE ESP32 SUDAH SIAP, HAPUS SIMULASI DI ATAS DAN GUNAKAN KODE ASLI INI:
     if (!connectedDevice || !activeCharacteristic) {
       setCardError("Perangkat Bluetooth belum terhubung.");
       return;
@@ -87,7 +70,6 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       setCardError("Gagal mengaktifkan sensor: " + err.message);
       setScanState(SCAN_STATE.IDLE);
     }
-    */
   };
 
   const processAuthentication = async (uid) => {
@@ -183,7 +165,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
                   fontSize="sm"
                 />
                 <Button onClick={handleStartScan} bg="white" color="#F97316" border="1.5px solid" borderColor="#F97316" _hover={{ bg: "#fff7ed" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="700">
-                  Simulasikan Tap Kartu
+                  Tap Kartu
                 </Button>
               </VStack>
             )}
