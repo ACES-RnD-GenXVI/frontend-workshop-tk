@@ -12,16 +12,40 @@ import {
 } from "@chakra-ui/react";
 import Header from "../components/Header";
 import { getAuthLogs } from "../data/authLogs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+
+const REDIRECT_URL = "https://www.umn.ac.id/teknik-komputer/";
+const COUNTDOWN_SECONDS = 5;
 
 const MOCK_UID = "A4-B2-F9-1C";
 
 const SuccessPage = ({ onLogout }) => {
   const currentUser = JSON.parse(localStorage.getItem("currentUser")) || {};
   const [recentLogs, setRecentLogs] = useState([]);
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
 
   useEffect(() => {
     setRecentLogs(getAuthLogs().slice(0, 3));
+  }, []);
+
+  // Countdown + auto-redirect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          window.location.href = REDIRECT_URL;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    // Cleanup: stops the timer if user logs out before countdown ends
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRedirectNow = useCallback(() => {
+    window.location.href = REDIRECT_URL;
   }, []);
 
   const handleLogout = () => {
@@ -102,29 +126,44 @@ const SuccessPage = ({ onLogout }) => {
         {/* Success indicator */}
         <VStack spacing={1} mb={6} textAlign="center">
           <Box
-            w="48px"
-            h="48px"
+            w="56px"
+            h="56px"
             borderRadius="full"
             bg="#f0fdf4"
-            border="1px solid"
-            borderColor="#bbf7d0"
+            border="2px solid"
+            borderColor="#86efac"
             display="flex"
             alignItems="center"
             justifyContent="center"
             mb={3}
+            boxShadow="0 0 0 6px rgba(134,239,172,0.18)"
           >
-            <Text fontSize="22px" lineHeight="1">✓</Text>
+            <Text fontSize="26px" lineHeight="1">✓</Text>
           </Box>
           <Text
-            fontSize="21px"
+            fontSize="11px"
+            fontWeight="800"
+            color="#16a34a"
+            letterSpacing="2px"
+            textTransform="uppercase"
+          >
+            Access Granted
+          </Text>
+          <Text
+            fontSize="20px"
             fontWeight="700"
             color="#0d2d6b"
             letterSpacing="-0.5px"
+            mt={1}
           >
-            Authentication Success
+            Authentication successful.
           </Text>
-          <Text fontSize="13px" color="gray.400" mt={1}>
-            Welcome, {currentUser.name || "Admin"}
+          <Text fontSize="13px" color="gray.500" mt={1}>
+            Welcome to Computer Engineering UMN,{" "}
+            <Box as="span" fontWeight="600" color="#0d2d6b">
+              {currentUser.name || "Admin"}
+            </Box>
+            .
           </Text>
         </VStack>
 
@@ -206,6 +245,60 @@ const SuccessPage = ({ onLogout }) => {
             )}
           </VStack>
         </Box>
+
+        {/* ── Redirect CTA ─────────────────────────────────────────── */}
+        <Box
+          mb={4}
+          p={4}
+          borderRadius="12px"
+          border="1px solid"
+          borderColor="#bbf7d0"
+          bg="#f0fdf4"
+        >
+          {/* Primary redirect button */}
+          <Button
+            onClick={handleRedirectNow}
+            bg="#0d2d6b"
+            color="white"
+            w="full"
+            h="44px"
+            borderRadius="8px"
+            fontSize="sm"
+            fontWeight="700"
+            letterSpacing="0.2px"
+            mb={3}
+            transition="all 0.25s ease"
+            _hover={{ bg: "#1a3f8f", transform: "translateY(-1px)", boxShadow: "0 4px 16px rgba(13,45,107,0.25)" }}
+            _active={{ transform: "scale(0.98)" }}
+            rightIcon={<Box as="span" fontSize="14px">→</Box>}
+          >
+            Continue to Teknik Komputer UMN
+          </Button>
+
+          {/* Countdown progress bar */}
+          <Box w="full" h="4px" bg="#d1fae5" borderRadius="full" overflow="hidden" mb={2}>
+            <Box
+              h="full"
+              bg="#16a34a"
+              borderRadius="full"
+              style={{
+                width: `${(countdown / COUNTDOWN_SECONDS) * 100}%`,
+                transition: "width 1s linear",
+              }}
+            />
+          </Box>
+
+          {/* Countdown text */}
+          <Flex align="center" justify="center" gap={1}>
+            <Box w="6px" h="6px" borderRadius="full" bg={countdown > 0 ? "#16a34a" : "#bbf7d0"} flexShrink={0} />
+            <Text fontSize="12px" color="#16a34a" fontWeight="600">
+              {countdown > 0
+                ? `Redirecting in ${countdown} second${countdown !== 1 ? "s" : ""}…`
+                : "Redirecting…"}
+            </Text>
+          </Flex>
+        </Box>
+        {/* ─────────────────────────────────────────────────────────── */}
 
         {/* Logout */}
         <Button
