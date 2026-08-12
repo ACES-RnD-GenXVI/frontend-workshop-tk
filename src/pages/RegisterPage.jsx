@@ -40,42 +40,11 @@ const RegisterPage = ({ onNavigateToLogin }) => {
   }, []);
 
   const handleConnectSmartCard = async () => {
-    // Bagian Bluetooth dinonaktifkan sementara dan diganti dengan generator UID acak
-    setIsConnecting(true);
-    setDetectedUID(null);
-    setScanMessage("Mengaktifkan mode scan simulator...");
-
-    setTimeout(() => {
-      // Membuat kombinasi UID acak sebanyak 4 segmen heksadesimal (Contoh: B3-F4-1A-9D)
-      const hexChars = "0123456789ABCDEF";
-      let mockUID = "";
-      for (let i = 0; i < 4; i++) {
-        mockUID += hexChars[Math.floor(Math.random() * 16)] + hexChars[Math.floor(Math.random() * 16)];
-        if (i < 3) mockUID += "-";
-      }
-
-      setDetectedUID(mockUID);
-      setScanMessage("Kartu Sukses Terikat!");
-      setIsConnecting(false);
-
-      localStorage.setItem("lastMockUID", mockUID);
-
-      toast({
-        title: "Simulasi RFID Terdeteksi",
-        description: `Berhasil mendapatkan Card UID simulator: ${mockUID}`,
-        status: "success",
-        duration: 3000,
-        position: "top",
-      });
-    }, 1500);
-
-    /* // CATATAN: Jika hardware ESP32 sudah siap, hapus baris simulasi di atas
-    // dan kembalikan tanda komentar (uncomment) pada kode asli Web Bluetooth di bawah ini:
-
+    // 1. Cek apakah ESP32 sudah terhubung
     if (!connectedDevice) {
       toast({
         title: "Hardware Terputus",
-        description: "Silakan muat ulang halaman atau sambungkan ulang Bluetooth ESP32.",
+        description: "Silakan hubungkan Bluetooth ESP32 terlebih dahulu melalui scanner.",
         status: "warning",
         duration: 4000,
         position: "top",
@@ -88,6 +57,7 @@ const RegisterPage = ({ onNavigateToLogin }) => {
     setScanMessage("Mengaktifkan mode scan pendaftaran...");
 
     try {
+      // 2. Callback untuk menerima kiriman UID dari ESP32
       const handleRegisterNotification = (event) => {
         const value = event.target.value;
         const decoder = new TextDecoder("utf-8");
@@ -97,10 +67,21 @@ const RegisterPage = ({ onNavigateToLogin }) => {
           setDetectedUID(rawUID);
           setScanMessage("Kartu Sukses Terikat!");
           setIsConnecting(false);
+
+          toast({
+            title: "RFID Terdeteksi",
+            description: `Berhasil mendapatkan Card UID: ${rawUID}`,
+            status: "success",
+            duration: 3000,
+            position: "top",
+          });
+
+          // Unsubscribe listener setelah berhasil scan 1 kartu
           if (unsubscribeRef.current) unsubscribeRef.current();
         }
       };
 
+      // 3. Mulai mendengarkan data dari ESP32
       const unsub = await startNotifications(ESP32_SERVICE_UUID, ESP32_CHAR_UUID, handleRegisterNotification);
       unsubscribeRef.current = unsub;
       setScanMessage("Silakan tempelkan kartu RFID baru pada reader ESP32...");
@@ -109,10 +90,10 @@ const RegisterPage = ({ onNavigateToLogin }) => {
         title: "Gagal Mengaitkan",
         description: err.message,
         status: "error",
+        position: "top",
       });
       setIsConnecting(false);
     }
-    */
   };
 
   const handleRegister = async () => {
