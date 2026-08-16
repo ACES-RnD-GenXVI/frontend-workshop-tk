@@ -20,7 +20,6 @@ import ScanAnimation from "../components/ScanAnimation";
 import { addAuthLog } from "../data/authLogs";
 import bcrypt from "bcryptjs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
-import { playBeepSound } from "../utils/sound";
 
 import { db } from "../firebase";
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
@@ -68,7 +67,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
         const rawUID = decoder.decode(value).trim();
 
         if (rawUID) {
-          playBeepSound("scan");
           setDetectedUID(rawUID);
           setScanMessage("Kartu Sukses Terikat!");
           setIsConnecting(false);
@@ -91,7 +89,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
       unsubscribeRef.current = unsub;
       setScanMessage("Silakan tempelkan kartu RFID baru pada reader ESP32...");
     } catch (err) {
-      playBeepSound("error");
       toast({
         title: "Gagal Mengaitkan",
         description: err.message,
@@ -104,7 +101,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
 
   const handleRegister = async () => {
     if (!name || !email || !password || !detectedUID) {
-      playBeepSound("error");
       toast({ title: "Formulir tidak lengkap", description: "Pastikan semua data diisi dan kartu sudah di-scan.", status: "warning", position: "top" });
       return;
     }
@@ -117,7 +113,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
       const emailQuery = query(usersCollectionRef, where("email", "==", email));
       const emailSnapshot = await getDocs(emailQuery);
       if (!emailSnapshot.empty) {
-        playBeepSound("error");
         toast({ title: "Email sudah terdaftar.", status: "error", position: "top" });
         setIsRegistering(false);
         return;
@@ -126,7 +121,6 @@ const RegisterPage = ({ onNavigateToLogin }) => {
       const uidQuery = query(usersCollectionRef, where("cardUID", "==", detectedUID));
       const uidSnapshot = await getDocs(uidQuery);
       if (!uidSnapshot.empty) {
-        playBeepSound("error");
         toast({ title: "Kartu RFID ini sudah terikat akun lain!", status: "error", position: "top" });
         setIsRegistering(false);
         return;
@@ -143,11 +137,9 @@ const RegisterPage = ({ onNavigateToLogin }) => {
 
       addAuthLog(`User baru didaftarkan: ${name}`);
 
-      playBeepSound("success");
       toast({ title: "Registrasi Akun Sukses!", status: "success", position: "top" });
       onNavigateToLogin();
     } catch (error) {
-      playBeepSound("error");
       toast({ title: "Firebase Error", description: error.message, status: "error", position: "top" });
     } finally {
       setIsRegistering(false);
