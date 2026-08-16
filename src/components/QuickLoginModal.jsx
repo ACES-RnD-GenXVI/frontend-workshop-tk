@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { addAuthLog } from "../data/authLogs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
+import ScanAnimation from "../components/ScanAnimation";
 
 import { db } from "../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -46,6 +47,16 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   }, [isOpen]);
 
   const handleStartScan = async () => {
+    // Mode manual/simulator: UID diketik langsung, tidak butuh BLE
+    if (manualUIDInput.trim()) {
+      const uid = manualUIDInput.trim();
+      setDetectedUID(uid);
+      setScanState(SCAN_STATE.SCANNING);
+      setScanMessage("Memproses UID manual...");
+      processAuthentication(uid);
+      return;
+    }
+
     if (!connectedDevice || !activeCharacteristic) {
       setCardError("Perangkat Bluetooth belum terhubung.");
       return;
@@ -129,13 +140,17 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         <Box h="3px" bg={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#1a56db" : "#0d2d6b"} />
         <ModalBody py={5} px={7}>
           <VStack spacing={4} align="center">
-            <Box w="52px" h="52px" borderRadius="12px" bg={scanState === SCAN_STATE.UID_DETECTED ? "#fff7ed" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#eff4ff" : "#eaeff7"} border="1px solid" borderColor={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#1a56db" : "#c5d4eb"} display="flex" alignItems="center" justifyContent="center">
-              <Box as="svg" viewBox="0 0 24 24" w="24px" h="24px" fill="none">
-                <Box as="rect" x="2" y="5" width="20" height="14" rx="2" stroke={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#1a56db" : "#7091c4"} strokeWidth="1.5" />
-                <Box as="line" x1="2" y1="10" x2="22" y2="10" stroke={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#1a56db" : "#7091c4"} strokeWidth="1.5" />
-                <Box as="rect" x="5" y="13" width="4" height="3" rx="0.5" fill={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : (scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING) ? "#1a56db" : "#c5d4eb"} />
+            {scanState === SCAN_STATE.SCANNING || scanState === SCAN_STATE.AUTHENTICATING ? (
+              <ScanAnimation />
+            ) : (
+              <Box w="52px" h="52px" borderRadius="12px" bg={scanState === SCAN_STATE.UID_DETECTED ? "#fff7ed" : "#eaeff7"} border="1px solid" borderColor={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : "#c5d4eb"} display="flex" alignItems="center" justifyContent="center">
+                <Box as="svg" viewBox="0 0 24 24" w="24px" h="24px" fill="none">
+                  <Box as="rect" x="2" y="5" width="20" height="14" rx="2" stroke={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : "#7091c4"} strokeWidth="1.5" />
+                  <Box as="line" x1="2" y1="10" x2="22" y2="10" stroke={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : "#7091c4"} strokeWidth="1.5" />
+                  <Box as="rect" x="5" y="13" width="4" height="3" rx="0.5" fill={scanState === SCAN_STATE.UID_DETECTED ? "#F97316" : "#c5d4eb"} />
+                </Box>
               </Box>
-            </Box>
+            )}
 
             <VStack spacing={1} textAlign="center">
               <Text fontSize="16px" fontWeight="700" color="#0d2d6b" letterSpacing="-0.3px">
@@ -165,7 +180,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
                   fontSize="sm"
                 />
                 <Button onClick={handleStartScan} bg="white" color="#F97316" border="1.5px solid" borderColor="#F97316" _hover={{ bg: "#fff7ed" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="700">
-                  Tap Kartu
+                  {manualUIDInput.trim() ? "Verifikasi UID" : "Tap Kartu"}
                 </Button>
               </VStack>
             )}

@@ -11,29 +11,53 @@ import {
   Avatar,
 } from "@chakra-ui/react";
 import Header from "../components/Header";
+import PageShell from "../components/PageShell";
+import GlassCard from "../components/GlassCard";
 import { getAuthLogs } from "../data/authLogs";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 const REDIRECT_URL = "https://www.umn.ac.id/teknik-komputer/";
 const COUNTDOWN_SECONDS = 5;
+const REDIRECTED_ONCE_KEY = "redirectedOnce";
 
 const MOCK_UID = "A4-B2-F9-1C";
+
+const CONFETTI = [
+  { left: "8%", delay: 0, duration: 2.8, color: "#F97316", rotate: 0 },
+  { left: "20%", delay: 0.25, duration: 3.1, color: "#3b82f6", rotate: 45 },
+  { left: "33%", delay: 0.1, duration: 2.6, color: "#22c55e", rotate: 90 },
+  { left: "47%", delay: 0.4, duration: 3.3, color: "#fbbf24", rotate: 135 },
+  { left: "61%", delay: 0.2, duration: 2.9, color: "#a855f7", rotate: 180 },
+  { left: "74%", delay: 0.5, duration: 3.0, color: "#F97316", rotate: 225 },
+  { left: "88%", delay: 0.15, duration: 2.7, color: "#3b82f6", rotate: 270 },
+];
 
 const SuccessPage = ({ onLogout }) => {
   const currentUser = JSON.parse(localStorage.getItem("currentUser")) || {};
   const [recentLogs, setRecentLogs] = useState([]);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const [wasRedirected, setWasRedirected] = useState(false);
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
     setRecentLogs(getAuthLogs().slice(0, 3));
   }, []);
 
-  // Countdown + auto-redirect
+  // Countdown + auto-redirect (sekali per login)
   useEffect(() => {
+    // Sudah pernah redirect di login ini → tampilkan statis, tanpa countdown
+    if (localStorage.getItem(REDIRECTED_ONCE_KEY) === "true") {
+      setWasRedirected(true);
+      setCountdown(0);
+      return;
+    }
+
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
+          redirectedRef.current = true;
+          localStorage.setItem(REDIRECTED_ONCE_KEY, "true");
           window.location.href = REDIRECT_URL;
           return 0;
         }
@@ -42,6 +66,18 @@ const SuccessPage = ({ onLogout }) => {
     }, 1000);
     // Cleanup: stops the timer if user logs out before countdown ends
     return () => clearInterval(interval);
+  }, []);
+
+  // Setelah kembali dari redirect (tombol Back / bfcache), jangan auto-redirect lagi
+  useEffect(() => {
+    const onPageShow = (e) => {
+      if (e.persisted && redirectedRef.current) {
+        setWasRedirected(true);
+        setCountdown(0);
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
   }, []);
 
   const handleRedirectNow = useCallback(() => {
@@ -61,26 +97,33 @@ const SuccessPage = ({ onLogout }) => {
   ];
 
   return (
-    <Box
-      minH="100vh"
-      bg="#eaeff7"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      px={4}
-      py={8}
-    >
+    <PageShell>
       {/* Main card */}
-      <Box
-        w="full"
-        maxW="540px"
-        bg="white"
-        borderRadius="20px"
-        boxShadow="0 12px 48px rgba(13,45,107,0.15), 0 2px 8px rgba(0,0,0,0.08)"
+      <GlassCard
         px={{ base: 7, sm: 10 }}
         py={8}
         animation="fadeInUp 0.4s ease-out forwards"
       >
+        {/* Confetti overlay */}
+        <Box position="absolute" inset={0} pointerEvents="none">
+          {CONFETTI.map((c, i) => (
+            <Box
+              key={i}
+              position="absolute"
+              top="-12px"
+              left={c.left}
+              w="8px"
+              h="14px"
+              borderRadius="2px"
+              bg={c.color}
+              transform={`rotate(${c.rotate}deg)`}
+              style={{
+                animation: `confettiFall ${c.duration}s ease-in ${c.delay}s forwards`,
+              }}
+            />
+          ))}
+        </Box>
+
         {/* Logos */}
         <Header />
 
@@ -125,20 +168,41 @@ const SuccessPage = ({ onLogout }) => {
 
         {/* Success indicator */}
         <VStack spacing={1} mb={6} textAlign="center">
-          <Box
-            w="56px"
-            h="56px"
-            borderRadius="full"
-            bg="#f0fdf4"
-            border="2px solid"
-            borderColor="#86efac"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            mb={3}
-            boxShadow="0 0 0 6px rgba(134,239,172,0.18)"
-          >
-            <Text fontSize="26px" lineHeight="1">✓</Text>
+          <Box mb={3} position="relative">
+            <Box
+              position="absolute"
+              inset="8px"
+              borderRadius="full"
+              bg="radial-gradient(circle, rgba(34,197,94,0.35), transparent 70%)"
+              filter="blur(4px)"
+            />
+            <Box as="svg" viewBox="0 0 52 52" w="64px" h="64px" mx="auto" position="relative">
+              <Box
+                as="circle"
+                cx="26"
+                cy="26"
+                r="24"
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="3"
+                strokeDasharray="151"
+                strokeDashoffset="151"
+                transform="rotate(-90 26 26)"
+                style={{ animation: "drawCircle 0.6s ease-out forwards" }}
+              />
+              <Box
+                as="path"
+                fill="none"
+                stroke="#16a34a"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeDasharray="40"
+                strokeDashoffset="40"
+                d="M14 27l8 8 16-17"
+                style={{ animation: "drawCheck 0.45s ease-out 0.55s forwards" }}
+              />
+            </Box>
           </Box>
           <Text
             fontSize="11px"
@@ -258,7 +322,7 @@ const SuccessPage = ({ onLogout }) => {
           {/* Primary redirect button */}
           <Button
             onClick={handleRedirectNow}
-            bg="#0d2d6b"
+            bgGradient="linear(to-r, #0d2d6b, #1a3f8f)"
             color="white"
             w="full"
             h="44px"
@@ -268,7 +332,7 @@ const SuccessPage = ({ onLogout }) => {
             letterSpacing="0.2px"
             mb={3}
             transition="all 0.25s ease"
-            _hover={{ bg: "#1a3f8f", transform: "translateY(-1px)", boxShadow: "0 4px 16px rgba(13,45,107,0.25)" }}
+            _hover={{ bgGradient: "linear(to-r, #163a80, #2458c4)", transform: "translateY(-1px)", boxShadow: "0 6px 20px rgba(13,45,107,0.4)" }}
             _active={{ transform: "scale(0.98)" }}
             rightIcon={<Box as="span" fontSize="14px">→</Box>}
           >
@@ -276,25 +340,30 @@ const SuccessPage = ({ onLogout }) => {
           </Button>
 
           {/* Countdown progress bar */}
-          <Box w="full" h="4px" bg="#d1fae5" borderRadius="full" overflow="hidden" mb={2}>
-            <Box
-              h="full"
-              bg="#16a34a"
-              borderRadius="full"
-              style={{
-                width: `${(countdown / COUNTDOWN_SECONDS) * 100}%`,
-                transition: "width 1s linear",
-              }}
-            />
-          </Box>
+          {!wasRedirected && (
+            <Box w="full" h="4px" bg="rgba(16,185,129,0.18)" borderRadius="full" overflow="hidden" mb={2} boxShadow="inset 0 0 4px rgba(16,185,129,0.25)">
+              <Box
+                h="full"
+                bgGradient="linear(to-r, #22c55e, #10b981)"
+                borderRadius="full"
+                boxShadow="0 0 12px rgba(34,197,94,0.8)"
+                style={{
+                  width: `${(countdown / COUNTDOWN_SECONDS) * 100}%`,
+                  transition: "width 1s linear",
+                }}
+              />
+            </Box>
+          )}
 
           {/* Countdown text */}
           <Flex align="center" justify="center" gap={1}>
-            <Box w="6px" h="6px" borderRadius="full" bg={countdown > 0 ? "#16a34a" : "#bbf7d0"} flexShrink={0} />
-            <Text fontSize="12px" color="#16a34a" fontWeight="600">
-              {countdown > 0
-                ? `Redirecting in ${countdown} second${countdown !== 1 ? "s" : ""}…`
-                : "Redirecting…"}
+            <Box w="6px" h="6px" borderRadius="full" bg={wasRedirected ? "#F97316" : countdown > 0 ? "#16a34a" : "#bbf7d0"} flexShrink={0} />
+            <Text fontSize="12px" color={wasRedirected ? "#F97316" : "#16a34a"} fontWeight="600">
+              {wasRedirected
+                ? "Anda telah dialihkan. Gunakan tombol di atas untuk membukanya lagi."
+                : countdown > 0
+                  ? `Redirecting in ${countdown} second${countdown !== 1 ? "s" : ""}…`
+                  : "Redirecting…"}
             </Text>
           </Flex>
         </Box>
@@ -318,8 +387,8 @@ const SuccessPage = ({ onLogout }) => {
         >
           Logout
         </Button>
-      </Box>
-    </Box>
+      </GlassCard>
+    </PageShell>
   );
 };
 

@@ -16,7 +16,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+const _analytics = getAnalytics(app);
 //Recaptcha
 if (typeof window !== "undefined") {
   const isDevelopment = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -34,6 +34,5 @@ if (typeof window !== "undefined") {
     isTokenAutoRefreshEnabled: true
   });
 }
-
 // Inisialisasi Firestore Database
 export const db = getFirestore(app);

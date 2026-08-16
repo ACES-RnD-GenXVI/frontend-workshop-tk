@@ -12,13 +12,15 @@ import {
 } from "@chakra-ui/react";
 import Header from "../components/Header";
 import QuickLoginModal from "../components/QuickLoginModal";
+import PageShell from "../components/PageShell";
+import GlassCard from "../components/GlassCard";
 import { addAuthLog } from "../data/authLogs";
 import bcrypt from "bcryptjs";
 
 import { db } from "../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
 
-const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
+const LoginPage = ({ onNavigateToRegister, onNavigateToMentor, onLoginSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -94,8 +96,8 @@ const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
   };
 
   return (
-    <Box minH="100vh" bg="#eaeff7" display="flex" alignItems="center" justifyContent="center" px={4} py={8}>
-      <Box w="full" maxW="540px" bg="white" borderRadius="20px" boxShadow="0 12px 48px rgba(13,45,107,0.15)" px={{ base: 7, sm: 10 }} py={8}>
+    <PageShell>
+      <GlassCard px={{ base: 7, sm: 10 }} py={8}>
         <Header />
         <Divider borderColor="gray.100" mb={6} />
 
@@ -121,7 +123,7 @@ const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
             </Box>
           )}
 
-          <Button onClick={handleLogin} isLoading={isLoading} loadingText="Authenticating..." bg="#0d2d6b" color="white" _hover={{ bg: "#1a3f8f" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="600">
+          <Button onClick={handleLogin} isLoading={isLoading} loadingText="Authenticating..." bgGradient="linear(to-r, #0d2d6b, #1a3f8f)" color="white" _hover={{ bgGradient: "linear(to-r, #163a80, #2458c4)", transform: "translateY(-1px)", boxShadow: "0 6px 18px rgba(13,45,107,0.35)" }} _active={{ transform: "scale(0.98)" }} transition="all 0.2s ease" w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="600">
             Login
           </Button>
 
@@ -140,10 +142,15 @@ const LoginPage = ({ onNavigateToRegister, onLoginSuccess }) => {
           <Text fontSize="sm" color="gray.400">Belum punya akun?</Text>
           <Button variant="link" fontSize="sm" fontWeight="600" color="#0d2d6b" onClick={onNavigateToRegister}>Daftar</Button>
         </Flex>
-      </Box>
+        <Flex justify="center" mt={4}>
+          <Button variant="link" size="xs" fontSize="11px" color="gray.400" onClick={onNavigateToMentor}>
+            Mentor
+          </Button>
+        </Flex>
+      </GlassCard>
 
       <QuickLoginModal isOpen={isQuickLoginOpen} onClose={() => setIsQuickLoginOpen(false)} onLoginSuccess={onLoginSuccess} />
-    </Box>
+    </PageShell>
   );
 };
 

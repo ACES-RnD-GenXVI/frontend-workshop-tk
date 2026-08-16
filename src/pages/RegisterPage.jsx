@@ -14,6 +14,9 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import Header from "../components/Header";
+import PageShell from "../components/PageShell";
+import GlassCard from "../components/GlassCard";
+import ScanAnimation from "../components/ScanAnimation";
 import { addAuthLog } from "../data/authLogs";
 import bcrypt from "bcryptjs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
@@ -152,9 +155,13 @@ const RegisterPage = ({ onNavigateToLogin }) => {
     h: "44px",
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleRegister();
+  };
+
   return (
-    <Box minH="100vh" bg="#eaeff7" display="flex" alignItems="center" justifyContent="center" px={4} py={8}>
-      <Box w="full" maxW="540px" bg="white" borderRadius="20px" boxShadow="0 12px 48px rgba(13,45,107,0.15)" px={{ base: 7, sm: 10 }} py={8}>
+    <PageShell>
+      <GlassCard px={{ base: 7, sm: 10 }} py={8}>
         <Header />
         <Divider borderColor="gray.100" mb={6} />
         <Box mb={6} textAlign="center">
@@ -165,15 +172,15 @@ const RegisterPage = ({ onNavigateToLogin }) => {
         <VStack spacing={4}>
           <FormControl>
             <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Nama Lengkap</FormLabel>
-            <Input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" {...inputStyles} />
+            <Input type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={handleKeyDown} placeholder="John Doe" {...inputStyles} />
           </FormControl>
           <FormControl>
             <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Email</FormLabel>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" {...inputStyles} />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={handleKeyDown} placeholder="john@example.com" {...inputStyles} />
           </FormControl>
           <FormControl>
             <FormLabel fontSize="10px" fontWeight="700" color="gray.400" textTransform="uppercase">Password</FormLabel>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" {...inputStyles} />
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={handleKeyDown} placeholder="••••••••" {...inputStyles} />
           </FormControl>
 
           <FormControl>
@@ -184,10 +191,17 @@ const RegisterPage = ({ onNavigateToLogin }) => {
                 Scan Kartu
               </Button>
             </HStack>
-            {isConnecting && <Text fontSize="xs" color="blue.600" mt={1} fontWeight="500">{scanMessage}</Text>}
+            {isConnecting && (
+              <Box w="full" bg="gray.50" border="1px solid" borderColor="#bfdbfe" borderRadius="10px" px={4} py={3} mt={1}>
+                <HStack spacing={3}>
+                  <ScanAnimation />
+                  <Text fontSize="xs" color="blue.600" fontWeight="600">{scanMessage}</Text>
+                </HStack>
+              </Box>
+            )}
           </FormControl>
 
-          <Button onClick={handleRegister} isLoading={isRegistering} bg="#0d2d6b" color="white" _hover={{ bg: "#1a3f8f" }} w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="600" mt={4}>
+          <Button onClick={handleRegister} isLoading={isRegistering} bgGradient="linear(to-r, #0d2d6b, #1a3f8f)" color="white" _hover={{ bgGradient: "linear(to-r, #163a80, #2458c4)", transform: "translateY(-1px)", boxShadow: "0 6px 18px rgba(13,45,107,0.35)" }} _active={{ transform: "scale(0.98)" }} transition="all 0.2s ease" w="full" h="44px" borderRadius="8px" fontSize="sm" fontWeight="600" mt={4}>
             Daftar Sekarang
           </Button>
         </VStack>
@@ -196,8 +210,8 @@ const RegisterPage = ({ onNavigateToLogin }) => {
           <Text fontSize="sm" color="gray.400">Sudah punya akun?</Text>
           <Button variant="link" fontSize="sm" fontWeight="600" color="#0d2d6b" onClick={onNavigateToLogin}>Login</Button>
         </Flex>
-      </Box>
-    </Box>
+      </GlassCard>
+    </PageShell>
   );
 };
 
