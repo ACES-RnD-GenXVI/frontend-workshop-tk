@@ -15,6 +15,7 @@ import {
 import { addAuthLog } from "../data/authLogs";
 import { useAppBluetooth, ESP32_SERVICE_UUID, ESP32_CHAR_UUID } from "../components/BluetoothContext";
 import ScanAnimation from "../components/ScanAnimation";
+import { playBeepSound } from "../utils/sound";
 
 import { db } from "../firebase";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -53,6 +54,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       setDetectedUID(uid);
       setScanState(SCAN_STATE.SCANNING);
       setScanMessage("Memproses UID manual...");
+      playBeepSound("scan");
       processAuthentication(uid);
       return;
     }
@@ -70,6 +72,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         const decoder = new TextDecoder("utf-8");
         const uidString = decoder.decode(value).trim();
         if (uidString) {
+          playBeepSound("scan");
           setDetectedUID(uidString);
           if (unsubscribeRef.current) unsubscribeRef.current();
           processAuthentication(uidString);
@@ -98,6 +101,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           userCloudData = doc.data();
         });
 
+        playBeepSound("success");
         setScanMessage("Otentikasi Cloud Berhasil!");
         setScanState(SCAN_STATE.UID_DETECTED);
 
@@ -115,6 +119,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           onClose();
         }, 1000);
       } else {
+        playBeepSound("error");
         setScanMessage("Otentikasi Gagal");
         if (activeCharacteristic) {
           const encoder = new TextEncoder();
@@ -127,6 +132,7 @@ const QuickLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         }, 800);
       }
     } catch (error) {
+      playBeepSound("error");
       setScanState(SCAN_STATE.IDLE);
       setCardError("Koneksi Firebase Cloud Error: " + error.message);
     }
